@@ -1,0 +1,13 @@
+d_node: 64
+d_edge: 32
+d_attn_hid: 128
+d_node_hid: 128
+d_edge_hid: 64
+d_out_hid: 128
+d_out: 10
+n_layers: 4
+n_heads: 8
+dropout: 0.0
+use_cls_token: False
+pooling_method: "cat"
+pooling_layer_idx: "last"
