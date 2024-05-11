@@ -1,0 +1,1 @@
+{"train": {"path": ["checkpoints/cnn_0.ckpt", "checkpoints/cnn_1.ckpt", "checkpoints/cnn_2.ckpt", "checkpoints/cnn_3.ckpt"], "score": [75, 70, 34, 59]}, "val": {"path": ["checkpoints/cnn_4.ckpt"], "score": [17]}}
