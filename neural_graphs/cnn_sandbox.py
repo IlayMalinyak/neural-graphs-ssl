@@ -26,10 +26,10 @@ for i in range(5):
     torch.save(cnn.state_dict(), f'{dataset_dir}/checkpoints/cnn_{i}.ckpt')
     if i < 4:
         train_path.append(f'checkpoints/cnn_{i}.ckpt')
-        train_score.append(np.random.randint(0, 100))
+        train_score.append(torch.randn(10).tolist())
     else:
         val_path.append(f'checkpoints/cnn_{i}.ckpt')
-        val_score.append(np.random.randint(0, 100))
+        val_score.append(torch.randn(10).tolist())
 
 
 splits = {'train': {'path': train_path, 'score': train_score}, 'val': {'path': val_path, 'score': val_score}, }
@@ -41,5 +41,5 @@ cnn_dataset = CNNDataset(dataset_dir=f"{dataset_dir}",
                          splits_path=f"splits.json",
                         max_kernel_size=(9, 9)
                          )
-
-print(cnn_dataset[0])
+sample = cnn_dataset[0]
+print(sample['y'])

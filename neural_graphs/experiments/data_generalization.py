@@ -14,7 +14,7 @@ from torch.nn.utils import vector_to_parameters
 from torchvision.models.vision_transformer import _vision_transformer
 
 from experiments.cnn_generalization.utils import cnn_to_tg_data, pad_and_flatten_kernel
-from experiments.transformer_generalization.utils import vit_to_tg_data
+# from experiments.transformer_generalization.utils import vit_to_tg_data
 
 
 class CNNBatch(NamedTuple):
@@ -235,7 +235,7 @@ class CNNDataset(torch.utils.data.Dataset):
             for k, v in state_dict.items()
             if "bias" in k
         ]
-        score = float(self.dataset["score"][item])
+        score = self.dataset["score"][item]
 
         # NOTE: We assume that the architecture includes linear layers and
         # convolutional layers
