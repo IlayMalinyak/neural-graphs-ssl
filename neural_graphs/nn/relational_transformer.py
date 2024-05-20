@@ -97,7 +97,10 @@ class RelationalTransformer(nn.Module):
             nn.Linear(d_out_hid, d_out),
         )
 
+        self.final_features = (None,None,None,None)
+
     def forward(self, inputs):
+        attn_weights = None
         node_features, edge_features, mask = self.construct_graph(inputs)
         if self.use_cls_token:
             node_features = torch.cat(
@@ -109,15 +112,14 @@ class RelationalTransformer(nn.Module):
                 dim=1,
             )
             edge_features = F.pad(edge_features, (0, 0, 1, 0, 1, 0), value=0)
-
         for layer in self.layers:
-            node_features, edge_features = layer(node_features, edge_features, mask)
+            node_features, edge_features, attn_weights = layer(node_features, edge_features, mask)
 
         if self.pooling_method == "cls_token":
             graph_features = node_features[:, 0]
         else:
             graph_features = self.pool(node_features, edge_features)
-
+        self.final_features = (node_features, edge_features, graph_features, attn_weights)
         return self.proj_out(graph_features)
 
 
@@ -203,22 +205,23 @@ class RTLayer(nn.Module):
         self.load_state_dict(temp_state_dict)
 
     def node_updates(self, node_features, edge_features, mask):
-        # attn_out = checkpoint(self.self_attn, node_features, edge_features, mask)
+        out = self.self_attn(node_features, edge_features, mask)
+        attn_out, attn_weights = out
         node_features = self.node_ln0(
             node_features
             + self.dropout0(
-                self.lin0(self.self_attn(node_features, edge_features, mask))
+                self.lin0(attn_out)
             )
         )
         node_features = self.node_ln1(node_features + self.node_mlp(node_features))
 
-        return node_features
+        return node_features, attn_weights
 
     def forward(self, node_features, edge_features, mask):
-        node_features = self.node_updates(node_features, edge_features, mask)
+        node_features, attn_weights = self.node_updates(node_features, edge_features, mask)
         edge_features = self.edge_updates(node_features, edge_features, mask)
 
-        return node_features, edge_features
+        return node_features, edge_features, attn_weights
 
 
 class EdgeLayer(nn.Module):
@@ -341,14 +344,13 @@ class RTAttention(nn.Module):
             v = v_node.unsqueeze(-3) * qkv_edge[3] + qkv_edge[2]
         else:
             v = v_node.unsqueeze(-3) + qkv_edge[2]
-
         dots = self.scale * torch.einsum("b h i j d, b h i j d -> b h i j", q, k)
         # dots.masked_fill_(mask.unsqueeze(1).squeeze(-1) == 0, -1e-9)
 
         attn = F.softmax(dots, dim=-1)
         out = torch.einsum("b h i j, b h i j d -> b h i d", attn, v)
         out = self.cat_head_node(out)
-        return self.proj_out(out)
+        return self.proj_out(out), attn
 
 
 def Linear(in_features, out_features, bias=True):

@@ -1,4 +1,4 @@
 amsgrad: true
 fused: false
-lr: 1.0e-05
+lr: 8.0e-08
 weight_decay: 0.0005

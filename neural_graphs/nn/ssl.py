@@ -74,7 +74,7 @@ class prediction_MLP(nn.Module):
         return x
 
 
-def info_nce_loss(features, temperature):
+def info_nce_loss(features, t):
     # Calculate cosine similarity
     cos_sim = F.cosine_similarity(features[:, None, :], features[None, :, :], dim=-1)
     # Mask out cosine similarity to itself
@@ -83,7 +83,7 @@ def info_nce_loss(features, temperature):
     # Find positive example -> batch_size//2 away from the original example
     pos_mask = self_mask.roll(shifts=cos_sim.shape[0] // 2, dims=0)
     # InfoNCE loss
-    cos_sim = cos_sim / temperature
+    cos_sim = cos_sim / t
     nll = -cos_sim[pos_mask] + torch.logsumexp(cos_sim, dim=-1)
     nll = nll.mean()
     return nll
@@ -99,19 +99,20 @@ class SimCLR(nn.Module):
     def forward(self, x, temperature=1.0):
         z = self.backbone(x)
         p = self.projector(z)
-        L = info_nce_loss(z, temperature=temperature)
-        return {'loss': L, 'features': z, 'predictions': p}
+        p = self.predictor(p)
+        L = info_nce_loss(p, t=temperature)
+        graph_features = self.backbone.final_features
+        return {'loss': L, 'features': z, 'predictions': p, 'graph_features': graph_features}
 
 
-def SiamseLoss(p, z, version='simplified'):  # negative cosine similarity
+def SiamseLoss(p, z, version='simplified', t=1.0):  # negative cosine similarity
     if version == 'original':
         z = z.detach()  # stop gradient
         p = F.normalize(p, dim=1)  # l2-normalize
-        z = F.normalize(z, dim=1)  # l2-normalize
         return -(p * z).sum(dim=1).mean()
 
     elif version == 'simplified':  # same thing, much faster. Scroll down, speed test in __main__
-        return - F.cosine_similarity(p, z.detach(), dim=-1).mean()
+        return - (F.cosine_similarity(p, z.detach(), dim=-1)/t).mean()
     else:
         raise Exception
 
@@ -129,11 +130,12 @@ class SimSiam(nn.Module):
         )
         self.predictor = prediction_MLP()
 
-    def forward(self, inputs):
+    def forward(self, inputs, temperature=1.0):
         b_size = inputs[0][0].shape[0]
         f, h = self.encoder, self.predictor
         z = f(inputs)
         z1, z2 = z[:b_size//2], z[b_size//2:]
         p1, p2 = h(z1), h(z2)
-        L = SiamseLoss(p1, z2) / 2 + SiamseLoss(p2, z1) / 2
-        return {'loss': L, 'features': (z1, z2), 'predictions': (p1, p2)}
+        L = SiamseLoss(p1, z2, t=temperature) / 2 + SiamseLoss(p2, z1, t=temperature) / 2
+        graph_features = self.backbone.final_features
+        return {'loss': L, 'features': z, 'predictions': (p1, p2), 'graph_features': graph_features}

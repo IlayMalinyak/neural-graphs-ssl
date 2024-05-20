@@ -18,8 +18,8 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import json
 
-
-os.chdir("../")
+# os.chdir("../")
+print(os.getcwd())
 from experiments.data import INRDataset
 from experiments.utils import count_parameters, set_logger, set_seed, plot_fit
 from experiments.lr_scheduler import WarmupLRScheduler
@@ -29,13 +29,13 @@ from experiments.train import ContrastiveTrainer
 from nn.relational_transformer import RelationalTransformer
 from nn.ssl import SimSiam
 
-dataset_dir = r"C:\Users\Ilay\projects\geometric_dl\neural-graphs\experiments\inr_classification\dataset"
-checkpoint_dir = "./checkpoints/siamse"
+dataset_dir = r"C:\Users\Ilay\projects\geometric_dl\neural_graphs\experiments\inr_classification\dataset"
+checkpoint_dir = "checkpoints/siamse"
 splits_path = "mnist_splits.json"
 statistics_path = "mnist_statistics.pth"
-hparams_path = "./experiments/args.yaml"
+hparams_path = r"C:\Users\Ilay\projects\geometric_dl\neural_graphs\experiments\args.yaml"
 img_shape = (28, 28)
-batch_size = 32
+batch_size = 4
 exp_num = 0
 
 def setup(rank, world_size):
@@ -68,14 +68,14 @@ if __name__ == "__main__":
         dataset=train_set,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=slurm_cpus_per_task,
+        num_workers=1,
         pin_memory=True
     )
     val_loader = torch.utils.data.DataLoader(
         dataset=val_set,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=slurm_cpus_per_task,
+        num_workers=1,
         pin_memory=True
     )
 
@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     hparams = yaml.safe_load(open(hparams_path, 'r'))
     optim_params = {
-    'lr': 1e-3,
+    'lr': 1e-5,
     'amsgrad':True,
     'weight_decay':5e-4,
     'fused':False

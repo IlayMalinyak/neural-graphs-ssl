@@ -91,6 +91,8 @@ def plot_fit(
     log_loss=False,
     legend=None,
     train_test_overlay: bool = False,
+    acc_label: str = 'Accuracy (%)',
+    acc_ticks: tuple = None,
 ):
     """
     Plots a FitResult object.
@@ -133,7 +135,7 @@ def plot_fit(
         data =fit_res[attr]
         label = traintest if train_test_overlay else legend
         h = ax.plot(np.arange(1, len(data) + 1), data, label=label)
-        ax.set_title(attr)
+        # ax.set_title(attr)
 
         if lossacc == "loss":
             ax.set_xlabel("Iteration #")
@@ -143,7 +145,10 @@ def plot_fit(
                 ax.set_ylabel("Loss (log)")
         else:
             ax.set_xlabel("Epoch #")
-            ax.set_ylabel("Accuracy (%)")
+            ax.set_ylabel(acc_label)
+            if acc_ticks is not None:
+                ax.set_yticks(acc_ticks[0])
+                ax.set_yticklabels(acc_ticks[1])
 
         if legend or train_test_overlay:
             ax.legend()
