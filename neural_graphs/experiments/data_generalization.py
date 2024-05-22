@@ -12,10 +12,140 @@ import torch
 import torch.nn.functional as F
 from torch.nn.utils import vector_to_parameters
 from torchvision.models.vision_transformer import _vision_transformer
+from torch_geometric.data import Data, Dataset
+from experiments.data import INRDataset
+
 
 from experiments.cnn_generalization.utils import cnn_to_tg_data, pad_and_flatten_kernel
 # from experiments.transformer_generalization.utils import vit_to_tg_data
 
+def data_to_graph(
+    weights,
+    biases,
+    weights_mean=None,
+    weights_std=None,
+    biases_mean=None,
+    biases_std=None,
+):
+    weights_mean = weights_mean if weights_mean is not None else [0.0] * len(weights)
+    weights_std = weights_std if weights_std is not None else [1.0] * len(weights)
+    biases_mean = biases_mean if biases_mean is not None else [0.0] * len(biases)
+    biases_std = biases_std if biases_std is not None else [1.0] * len(biases)
+
+    # The graph will have as many nodes as the total number
+    # output dimensions for each linear layer
+    device = weights[0].device
+    num_input_nodes = weights[0].shape[0]
+    num_nodes = num_input_nodes + sum(b.shape[0] for b in biases)
+
+    edge_features = torch.zeros(
+        num_nodes, num_nodes, weights[0].shape[-1], device=device
+    )
+    edge_feature_masks = torch.zeros(
+        num_nodes, num_nodes, device=device, dtype=torch.bool
+    )
+    adjacency_matrix = torch.zeros(
+        num_nodes, num_nodes, device=device, dtype=torch.bool
+    )
+
+    row_offset = 0
+    col_offset = num_input_nodes  # no edge to input nodes
+    for i, w in enumerate(weights):
+        num_in, num_out = w.shape[:2]
+        edge_features[
+            row_offset : row_offset + num_in,
+            col_offset : col_offset + num_out,
+        ] = (w - weights_mean[i]) / weights_std[i]
+        edge_feature_masks[
+            row_offset : row_offset + num_in, col_offset : col_offset + num_out
+        ] = (w.shape[-1] == 1)
+        adjacency_matrix[
+            row_offset : row_offset + num_in, col_offset : col_offset + num_out
+        ] = True
+        row_offset += num_in
+        col_offset += num_out
+
+    node_features = torch.cat(
+        [
+            torch.zeros((num_input_nodes, 1), device=device, dtype=biases[0].dtype),
+            *[(b - biases_mean[i]) / biases_std[i] for i, b in enumerate(biases)],
+        ]
+    )
+
+    return node_features, edge_features, edge_feature_masks, adjacency_matrix
+class SpectralDataset(Dataset):
+    def __init__(
+            self,
+            dataset_dir,
+            splits_path,
+            split="train",
+            normalize=False,
+            statistics_path="statistics.pth",
+            class_mapping=None
+    ):
+        super(SpectralDataset, self).__init__()
+        self.split = split
+        self.splits_path = (
+            (Path(dataset_dir) / Path(splits_path)).expanduser().resolve()
+        )
+        self.root = self.splits_path.parent
+        self.normalize = normalize
+        with self.splits_path.open("r") as f:
+            self.dataset = json.load(f)[self.split]
+        self.dataset["path"] = [
+            Path(dataset_dir) / Path(p) for p in self.dataset["path"]
+        ]
+
+        if self.normalize:
+            statistics_path = (
+                (Path(dataset_dir) / Path(statistics_path)).expanduser().resolve()
+            )
+            self.stats = torch.load(statistics_path, map_location="cpu")
+
+        if class_mapping is not None:
+            self.class_mapping = class_mapping
+            self.dataset["label"] = [
+                self.class_mapping[l] for l in self.dataset["label"]
+            ]
+
+    def len(self):
+        return len(self.dataset["label"])
+
+    def _normalize(self, weights, biases):
+        wm, ws = self.stats["weights"]["mean"], self.stats["weights"]["std"]
+        bm, bs = self.stats["biases"]["mean"], self.stats["biases"]["std"]
+
+        weights = tuple((w - m) / s for w, m, s in zip(weights, wm, ws))
+        biases = tuple((w - m) / s for w, m, s in zip(biases, bm, bs))
+
+        # Add feature dim
+        weights = tuple([w.unsqueeze(-1) for w in weights])
+        biases = tuple([b.unsqueeze(-1) for b in biases])
+
+        return weights, biases
+
+    def get(self, item):
+        path = self.dataset["path"][item]
+        state_dict = torch.load(path, map_location=lambda storage, loc: storage)
+        weights = tuple(
+            [v.permute(1, 0) for w, v in state_dict.items() if "weight" in w]
+        )
+        biases = tuple([v for w, v in state_dict.items() if "bias" in w])
+        label = int(self.dataset["label"][item])
+        weights = tuple([w.unsqueeze(-1) for w in weights])
+        biases = tuple([b.unsqueeze(-1) for b in biases])
+        weights, biases = INRDataset._permute(weights, biases)
+        node_features, edge_features, edge_feature_masks, adjacency_matrix = data_to_graph(
+            weights, biases, None, None, None, None
+        )
+        edge_index = adjacency_matrix.nonzero().t()
+        data = Data(
+            x=node_features,
+            edge_attr=edge_features[edge_index[0], edge_index[1]],
+            edge_index=edge_index,
+            mlp_edge_masks=edge_feature_masks[edge_index[0], edge_index[1]],
+        )
+        return data
 
 class CNNBatch(NamedTuple):
     weights: Tuple
@@ -40,7 +170,10 @@ class CNNBatch(NamedTuple):
         return len(self.weights[0])
 
 
+
+
 class CNNDataset(torch.utils.data.Dataset):
+
     def __init__(
         self,
         dataset_dir,

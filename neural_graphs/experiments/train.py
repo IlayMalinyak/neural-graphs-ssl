@@ -150,6 +150,7 @@ class Trainer(object):
             pred = out.argmax(1)
             correct += pred.eq(batch.label).sum()
             total += len(batch.label)
+            print(correct, total)
             if i > self.train_iter:
                 break
         return train_loss, correct / total

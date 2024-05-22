@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 import torch
+import json
 from torch.distributed import init_process_group
 
 common_parser = argparse.ArgumentParser(add_help=False, description="common parser")
@@ -155,3 +156,16 @@ def plot_fit(
         ax.grid(True)
 
     return fig, axes
+
+def process_results_multi_gpu(checkpoint_dir, exp_num, num_gpu=4, acc_as_std=False):
+    output_filename = f'{checkpoint_dir}/exp{exp_num}/fit_results.json'
+    with open(output_filename, "r") as f:
+        fit_results = json.load(f)
+    fit_results['train_acc'] = np.array(fit_results['train_acc']) / num_gpu
+    fit_results['val_acc'] = np.array(fit_results['val_acc']) / num_gpu
+    if acc_as_std:
+        fig, axes = plot_fit(fit_results, legend=exp_num, train_test_overlay=True,
+                             acc_label='std', acc_ticks=([0.08, 0.125, 0.15], ['', r'$\frac{1}{\sqrt{d}}$', '']))
+    else:
+        fig, axes = plot_fit(fit_results, legend=exp_num, train_test_overlay=True,)
+    plt.savefig(f"{checkpoint_dir}/exp{exp_num}/fit.png")

@@ -1,0 +1,1 @@
+{"train": {"path": ["0_high.ckpt", "10_low.ckpt", "11_high.ckpt", "12_low.ckpt", "1_high.ckpt", "2_high.ckpt", "3_low.ckpt", "4_low.ckpt"], "label": [1, 1, 1, 1, 1, 1, 1, 1]}, "val": {"path": ["5_low.ckpt", "6_high.ckpt", "7_high.ckpt", "8_high.ckpt", "9_low.ckpt"], "score": [1, 1, 1, 1, 1]}}

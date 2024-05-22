@@ -89,17 +89,22 @@ loader_aug = torch.utils.data.DataLoader(
 #                      Dropout(p=0.8),
 #                      RandomScale(min_scale=0.1, max_scale=0.4)])
 transforms1 = Compose([
-                       RandomTranslation(min_scale=0.1, max_scale=0.4),
-                       RandomRotate(min_deg=10, max_deg=90),])
-                       # RandomNoise(noise_min=1e-2, noise_max=1e-1),
+                        Binarize(),
+                       # RandomTranslation(min_scale=0.1, max_scale=0.4),
+                       RandomRotate(min_deg=10, max_deg=90),
+                       RandomNoise(noise_min=1e-2, noise_max=1e-1),
                        # Dropout(p=0.01),
                        # RandomScale(min_scale=0.1, max_scale=0.4)])
+                        ]
+)
 transforms2 = Compose([
-                       RandomTranslation(min_scale=0.1, max_scale=0.4),
-                       RandomRotate(min_deg=10, max_deg=90),]
-                       # RandomNoise(noise_min=1e-2, noise_max=1e-1),
+                        Binarize(),
+                       # RandomTranslation(min_scale=0.1, max_scale=0.4),
+                       RandomRotate(min_deg=10, max_deg=90),
+                       RandomNoise(noise_min=1e-2, noise_max=1e-1),
                        # Dropout(p=0.01),
                        # RandomScale(min_scale=0.1, max_scale=0.4)]
+                        ]
 )
 
 dataset_ssl = INRDatasetSSL(dataset_dir=dataset_dir,

@@ -317,6 +317,11 @@ class INRDatasetSSL(INRDataset):
         weights2 = tuple([w.unsqueeze(-1) for w in weights2])
         biases2 = tuple([b.unsqueeze(-1) for b in biases2])
 
+        ranges_w = [(w.max(), w.min()) for w in weights1]
+        ranges_b = [(b.max(), b.min()) for b in biases1]
+        print("ranges ", ranges_w, ranges_b)
+
+
         if self.normalize:
             weights1, biases1 = self._normalize(weights1, biases1)
             weights2, biases2 = self._normalize(weights2, biases2)

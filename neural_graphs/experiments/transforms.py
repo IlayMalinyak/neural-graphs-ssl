@@ -240,19 +240,42 @@ class Permute():
 
         for i, (w, b) in enumerate(zip(weights, biases)):
             if i == 0:
-                new_weights[i] = w[:, perms[i], :]
-                new_biases[i] = b[perms[i], :]
+                new_weights[i] = w[:, perms[i]]
+                new_biases[i] = b[perms[i]]
             elif i == len(weights) - 1:
-                new_weights[i] = w[perms[-1], :, :]
+                new_weights[i] = w[perms[-1], :]
                 new_biases[i] = b
             else:
-                new_weights[i] = w[perms[i - 1], :, :][:, perms[i], :]
-                new_biases[i] = b[perms[i], :]
+                new_weights[i] = w[perms[i - 1], :][:, perms[i]]
+                new_biases[i] = b[perms[i]]
         return new_weights, new_biases
 
 
     def __repr__(self):
-        return f"Shuffle(seg_len={self.segment_len})"
+        return "Permute"
+
+class Binarize():
+    def __init__(self, frac=0.1):
+        self.frac = frac
+
+    def __call__(self, weights, biases):
+        new_weights = [None] * len(weights)
+        new_biases = [None] * len(biases)
+        assert len(weights) == len(biases)
+        for i, (w, b) in enumerate(zip(weights, biases)):
+            new_weights[i] = w
+            new_biases[i] = b
+            if i == 0:
+                indices = torch.randperm(int(w.shape[1]*self.frac))
+                sample_w = w[:, indices]
+                sample_b = b[indices]
+                new_weights[i][:, indices] = torch.where(sample_w < 0, -torch.ones_like(sample_w).float(),
+                                                         torch.ones_like(sample_w).float())
+                new_biases[i][indices] = torch.where(sample_b < 0, -torch.ones_like(sample_b).float(),
+                                            torch.ones_like(sample_b).float())
+        return new_weights, new_biases
+
+
 
 
 class Identity():

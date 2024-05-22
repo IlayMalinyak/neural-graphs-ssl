@@ -49,6 +49,7 @@ def cnn_to_graph(
     row_offset = 0
     col_offset = num_input_nodes  # no edge to input nodes
     for i, w in enumerate(weights):
+        print(i, w.shape)
         num_in, num_out = w.shape[:2]
         edge_features[
             row_offset : row_offset + num_in,

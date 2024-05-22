@@ -1,0 +1,7 @@
+exp0 - None
+exp1 - all
+exp2 - Noise dropout and scale
+exp3 - rotation translation 
+
+* all augmentation includes node permutation
+* ssl exp_num = exp_num - 1
