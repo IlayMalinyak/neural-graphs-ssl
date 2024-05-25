@@ -170,4 +170,10 @@ nfn-fmnist-inrs
 states_cifar10_32x32_100trajectories_vit_inr_adamw_lr0.003_wd0.01_50ep.dat
 states_cifar10_32x32_100trajectories_vit_inr_adamw_lr0.003_wd0.01_50ep_meta_data.pkl
 
+.idea/
+
 __MACOSX/
+/experiments/bedlam_classification/dataset/bedlam_dataset_small/
+/experiments/cnn_generalization/dataset/smallcnnzoo-dataset_cifar10/
+/checkpoints/
+/experiments/bedlam/
