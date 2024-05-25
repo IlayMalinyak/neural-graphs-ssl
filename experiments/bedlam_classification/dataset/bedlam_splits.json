@@ -1,0 +1,5 @@
+{"train": {"path": ["bedlam_dataset_small/0_of_200_high_bmi.pth.tar", "bedlam_dataset_small/0_of_200_low_bmi.pth.tar",
+  "bedlam_dataset_small/1_of_200_high_bmi.pth.tar", "bedlam_dataset_small/1_of_200_low_bmi.pth.tar",
+  "bedlam_dataset_small/2_of_200_high_bmi.pth.tar", "bedlam_dataset_small/2_of_200_low_bmi.pth.tar",
+  "bedlam_dataset_small/3_of_200_high_bmi.pth.tar", "bedlam_dataset_small/3_of_200_low_bmi.pth.tar"],
+  "label": [0, 1, 0, 1, 0, 1, 0, 1]}, "val": {"path": ["bedlam_dataset_small/4_of_200_high_bmi.pth.tar", "bedlam_dataset_small/4_of_200_low_bmi.pth.tar"], "label": [0, 1]},"test": {"path": ["bedlam_dataset_small/4_of_200_high_bmi.pth.tar", "bedlam_dataset_small/4_of_200_low_bmi.pth.tar"], "label": [0, 1]}}

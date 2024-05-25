@@ -1,0 +1,1 @@
+{"train": {"path": ["0_of_200_high_bmi.pth.tar", "0_of_200_low_bmi.pth.tar", "1_of_200_high_bmi.pth.tar", "1_of_200_low_bmi.pth.tar", "2_of_200_high_bmi.pth.tar", "2_of_200_low_bmi.pth.tar", "3_of_200_high_bmi.pth.tar", "3_of_200_low_bmi.pth.tar"], "label": [0, 1, 0, 1, 0, 1, 0, 1]}, "val": {"path": ["4_of_200_high_bmi.pth.tar", "4_of_200_low_bmi.pth.tar"], "score": [0, 1]}}

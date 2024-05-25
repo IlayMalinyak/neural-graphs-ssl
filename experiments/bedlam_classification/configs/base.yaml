@@ -1,0 +1,57 @@
+defaults:
+  - model: rtransformer
+  - data: bedlam
+  - _self_
+
+n_epochs: 20
+batch_size: 1
+
+n_views: 1
+num_workers: 1
+eval_every: 1000
+num_accum: 1
+
+compile: false
+compile_kwargs:
+  # mode: reduce-overhead
+  mode: null
+  options:
+    matmul-padding: True
+
+optim:
+  _target_: torch.optim.AdamW
+  lr: 1e-3
+  weight_decay: 5e-4
+  amsgrad: True
+  fused: False
+
+scheduler:
+  _target_: experiments.lr_scheduler.WarmupLRScheduler
+  warmup_steps: 1000
+
+distributed: False
+
+load_ckpt: null
+
+use_amp: False
+gradscaler:
+  enabled: ${use_amp}
+autocast:
+  device_type: cuda
+  enabled: ${use_amp}
+  dtype: float16
+
+clip_grad: True
+clip_grad_max_norm: 10.0
+
+seed: 42
+save_path: ./output
+wandb:
+  project: bedlam-classification
+  entity: null
+  name: null
+
+matmul_precision: high
+cudnn_benchmark: False
+
+debug: False
