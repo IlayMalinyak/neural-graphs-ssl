@@ -473,3 +473,61 @@ def build_dataset(dataset_class, dataset_dir, splits_path, statistics_path):
     )
     return train_set, val_set
 
+class INRDatasetHMR(INRDataset):
+    def __init__(
+        self,
+        dataset_dir,
+        splits_path,
+        split="train",
+        normalize=False,
+        augmentation=False,
+        permutation=False,
+        statistics_path="statistics.pth",
+        translation_scale=0.25,
+        rotation_degree=45,
+        noise_scale=1e-1,
+        drop_rate=1e-2,
+        resize_scale=0.2,
+        pos_scale=0.0,
+        quantile_dropout=0.0,
+        class_mapping=None,
+    ):
+        super().__init__(dataset_dir, splits_path,
+                         split=split,
+                         normalize=normalize, augmentation=augmentation,
+                         permutation=permutation,
+                         statistics_path=statistics_path,
+                         translation_scale=translation_scale,
+                         rotation_degree=rotation_degree,
+                         noise_scale=noise_scale,
+                         drop_rate=drop_rate,
+                         resize_scale=resize_scale,
+                         pos_scale=pos_scale,
+                         quantile_dropout=quantile_dropout,
+                         class_mapping=class_mapping)
+
+
+    def __getitem__(self, item):
+        path = self.dataset["path"][item]
+        state_dict = torch.load(path, map_location=lambda storage, loc: storage)
+        keys_to_remove = ['decpose', 'deccam']
+        weights = tuple(
+            [v.permute(1, 0) for w, v in state_dict.items() if ("weight" in w and not w.split('.')[0] in keys_to_remove)]
+        )
+        biases = tuple([v for w, v in state_dict.items() if ("bias" in w  and not w.split('.')[0] in keys_to_remove)])
+        label = int(self.dataset["label"][item])
+
+        if self.augmentation:
+            weights, biases = self._augment(weights, biases)
+
+        # Add feature dim
+        weights = tuple([w.unsqueeze(-1) for w in weights])
+        biases = tuple([b.unsqueeze(-1) for b in biases])
+
+        if self.normalize:
+            weights, biases = self._normalize(weights, biases)
+
+        if self.permutation:
+            weights, biases = self._permute(weights, biases)
+
+        return Batch(weights=weights, biases=biases, label=label)
