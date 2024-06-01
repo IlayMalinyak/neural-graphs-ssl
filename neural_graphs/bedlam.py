@@ -86,13 +86,6 @@ if __name__ == "__main__":
         statistics_path=statistics_path,
     )
 
-    test_set = INRDataset(
-        dataset_dir=dataset_dir,
-        split="test",
-        normalize=False,
-        splits_path=splits_path,
-        statistics_path=statistics_path,
-    )
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set,
         batch_size=batch_size,
@@ -102,13 +95,6 @@ if __name__ == "__main__":
     )
     val_loader = torch.utils.data.DataLoader(
         dataset=val_set,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=slurm_cpus_per_task,
-        pin_memory=True
-    )
-    test_loader = torch.utils.data.DataLoader(
-        dataset=test_set,
         batch_size=batch_size,
         shuffle=False,
         num_workers=slurm_cpus_per_task,
@@ -198,7 +184,7 @@ if __name__ == "__main__":
     fig, axes = plot_fit(fit_results, legend=exp_num, train_test_overlay=True)
     plt.savefig(f"{checkpoint_dir}/exp{exp_num}/fit.png")
 
-    preds, gt, test_acc = trainer.predict(test_loader, local_rank)
+    preds, gt, test_acc = trainer.predict(val_loader, local_rank)
     print(f"Test accuracy: {test_acc}")
     df = pd.DataFrame({"preds": preds, "gt": gt})
     df.to_csv(f"{checkpoint_dir}/exp{exp_num}/test_preds.csv", index=False)
