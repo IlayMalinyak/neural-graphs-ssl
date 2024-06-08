@@ -55,8 +55,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("logdir", checkpoint_dir)
 
 if __name__ == "__main__":
-    process_results_multi_gpu(checkpoint_dir, 1, num_gpu=4, acc_as_std=False)
-    exit()
     slurm_cpus_per_task = int(os.environ.get("SLURM_CPUS_PER_TASK", "1"))
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
     rank = int(os.environ.get("SLURM_PROCID","0"))
@@ -167,6 +165,8 @@ if __name__ == "__main__":
             "num_probe_features": 0,
             "inr_model": inr_model,
             "stats": stats,
+            "sparsify": True,
+            'sym_edges': True,
         }
     )
 

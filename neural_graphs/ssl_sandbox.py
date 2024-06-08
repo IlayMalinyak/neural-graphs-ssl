@@ -89,21 +89,21 @@ loader_aug = torch.utils.data.DataLoader(
 #                      Dropout(p=0.8),
 #                      RandomScale(min_scale=0.1, max_scale=0.4)])
 transforms1 = Compose([
-                        Binarize(),
-                       # RandomTranslation(min_scale=0.1, max_scale=0.4),
+                        # Binarize(),
+                       RandomTranslation(min_scale=0.1, max_scale=0.4),
                        RandomRotate(min_deg=10, max_deg=90),
                        RandomNoise(noise_min=1e-2, noise_max=1e-1),
-                       # Dropout(p=0.01),
-                       # RandomScale(min_scale=0.1, max_scale=0.4)])
+                       Dropout(p=0.01),
+                       RandomScale(min_scale=0.1, max_scale=0.4),
                         ]
 )
 transforms2 = Compose([
-                        Binarize(),
-                       # RandomTranslation(min_scale=0.1, max_scale=0.4),
+                        # Binarize(),
+                       RandomTranslation(min_scale=0.1, max_scale=0.4),
                        RandomRotate(min_deg=10, max_deg=90),
                        RandomNoise(noise_min=1e-2, noise_max=1e-1),
-                       # Dropout(p=0.01),
-                       # RandomScale(min_scale=0.1, max_scale=0.4)]
+                       Dropout(p=0.01),
+                       RandomScale(min_scale=0.1, max_scale=0.4),
                         ]
 )
 
@@ -169,7 +169,10 @@ ax[3].imshow(make_grid(out_ssl[batch_size:]).permute(1, 2, 0).clip(0, 1))
 ax[3].set_title("Aug (2)")
 ax[3].set_axis_off()
 plt.tight_layout()
+plt.savefig("plots/mnist_inr_reconstruction_ssl.png")
 plt.show()
+
+exit()
 
 train_set = INRDatasetSSL(
     dataset_dir=dataset_dir,

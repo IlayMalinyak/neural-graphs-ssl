@@ -62,7 +62,10 @@ if __name__ == "__main__":
         rank = 0
 
 
-    train_set, val_set = build_dataset(INRDatasetSSL, dataset_dir, splits_path, statistics_path)
+    train_set, val_set = build_dataset(INRDatasetSSL, dataset_dir, splits_path,
+                                       statistics_path, label_sym=True)
+
+    x = train_set[0]
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set,
