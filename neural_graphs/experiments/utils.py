@@ -5,11 +5,15 @@ import random
 from typing import List, Tuple, Union
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import itertools
 import torch
 import json
 from torch.distributed import init_process_group
+import seaborn as sn
+import matplotlib.patches as patches
+
 
 common_parser = argparse.ArgumentParser(add_help=False, description="common parser")
 common_parser.add_argument("--data-path", type=str, help="path for dataset")
@@ -85,6 +89,63 @@ def ddp_setup(rank: int, world_size: int):
     os.environ["MASTER_PORT"] = "12355"
     init_process_group(backend="nccl", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
+
+
+def plot_features(g_features, e_features, n_features, prediction, gt, name, save_dir):
+    fig, ax = plt.subplots(1,2)
+    ax[0].plot(g_features.squeeze(), label="g_features")
+    ax[0].plot(n_features.squeeze().sum(axis=-1), label="n_features summed")
+    # ax[0].legend()
+    ax[1].imshow(e_features.squeeze().sum(axis=-1), label="e_features summed")
+    # ax[1].legend()
+    ax[0].grid()
+    fig.suptitle(f"Prediction: {prediction}, GT: {gt}")
+    plt.savefig(os.path.join(save_dir, f"{name}_features.png"))
+    plt.close()
+    return fig, ax
+
+def plot_attn_weights(attn, prediction, gt, layer_layout, num_heads=8, name='attn', save_dir='plots'):
+    summed_attn = attn.squeeze().sum(axis=0)
+    summed_attn = (summed_attn - summed_attn.min()) / (summed_attn.max() - summed_attn.min())
+    ax = sn.heatmap(summed_attn)
+    # Add a white rectangle patch for the area rows 0:2 and columns 0:2
+    rect1 = patches.Rectangle((0, 0), 2, 2, linewidth=2, edgecolor='white', facecolor='none')
+    ax.add_patch(rect1)
+
+    # Add a white rectangle patch for the area rows 2:34 and columns 2:34
+    rect2 = patches.Rectangle((2, 2), 32, 32, linewidth=2, edgecolor='white', facecolor='none')
+    ax.add_patch(rect2)
+    rect2 = patches.Rectangle((34, 34), 32, 32, linewidth=2, edgecolor='white', facecolor='none')
+    ax.add_patch(rect2)
+    plt.savefig(os.path.join(save_dir, f"{name}_attn_weights.png"))
+    plt.close()
+
+    max_attn = np.argmax(summed_attn, axis=-1)
+    attn_length = max_attn - np.arange(len(max_attn))
+    node_in = 0
+    node_out = layer_layout[0]
+    non_local_attention = np.zeros_like(max_attn)
+    fig, axes = plt.subplots(1,len(layer_layout)-1, figsize=(26,8))
+    for i, l in enumerate(layer_layout[1:]):
+        layer_attn = summed_attn[node_in:node_out, node_in:node_out]
+        sn.heatmap(layer_attn, ax=axes[i])
+        axes[i].set_title(f'Layer {i}')
+
+        forward_mask = max_attn[node_in:node_out] > node_out
+        backward_mask = max_attn[node_in:node_out] < node_in
+        non_local_attention[node_in:node_out] = np.logical_or(forward_mask, backward_mask)
+        node_in = node_out
+        node_out = node_out + l
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, f"{name}_attn_weights_layers.png"))
+    plt.close()
+    unique, counts = np.unique(max_attn, return_counts=True)
+    max_counts = counts.max()
+    strong_node = unique[np.argmax(counts)]
+    mean_attn = summed_attn.mean(axis=0)
+    return attn_length.mean(), strong_node, max_counts, mean_attn
+
 
 def plot_fit(
     fit_res: dict,
@@ -165,7 +226,111 @@ def process_results_multi_gpu(checkpoint_dir, exp_num, num_gpu=4, acc_as_std=Fal
     fit_results['val_acc'] = np.array(fit_results['val_acc']) / num_gpu
     if acc_as_std:
         fig, axes = plot_fit(fit_results, legend=exp_num, train_test_overlay=True,
-                             acc_label='std', acc_ticks=([0.08, 0.125, 0.15], ['', r'$\frac{1}{\sqrt{d}}$', '']))
+                             acc_label='std', acc_ticks=([0,0.08, 0.125, 0.15],
+                                                         ['0', '', r'$\frac{1}{\sqrt{d}}$', '']))
     else:
         fig, axes = plot_fit(fit_results, legend=exp_num, train_test_overlay=True,)
     plt.savefig(f"{checkpoint_dir}/exp{exp_num}/fit.png")
+    plt.close()
+    return fit_results
+
+def aggregate_loss_per_epoch(loss_list, acc_list):
+    num_epochs = len(acc_list)
+    iterations_per_epoch = len(loss_list) // num_epochs
+    validation_loss = np.array(loss_list)
+    loss_matrix = validation_loss[:iterations_per_epoch*num_epochs].reshape(num_epochs, iterations_per_epoch)
+    average_validation_loss_per_epoch = np.mean(loss_matrix, axis=1)
+    average_validation_loss_per_epoch = average_validation_loss_per_epoch.tolist()
+    return average_validation_loss_per_epoch
+def process_all_inr_experiments(checkpoint_dir, num_gpu=4, save_dir='plots'):
+    with open(f'{checkpoint_dir}/transforms.json', 'r') as f:
+        transforms_dict = json.load(f)
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 8))
+    max_loss = 0
+    acc_df = pd.DataFrame()
+    for dir in os.listdir(checkpoint_dir):
+        print(dir)
+        if os.path.isdir(os.path.join(checkpoint_dir, dir)) and dir.startswith("exp"):
+            transf = transforms_dict[dir]
+            preds_df = pd.read_csv(os.path.join(checkpoint_dir, dir, 'test_preds.csv'))
+            acc = preds_df['preds'].eq(preds_df['gt']).sum() / len(preds_df)
+            acc_df[transf] = [acc]
+            exp_num = dir[-1]
+            fit_res = process_results_multi_gpu(checkpoint_dir, exp_num, num_gpu=num_gpu, acc_as_std=False)
+            data_loss = fit_res['val_loss']
+            data_acc = fit_res['val_acc']
+            epoch_loss = aggregate_loss_per_epoch(data_loss, data_acc)
+            max_loss = max(max_loss, max(epoch_loss))
+            axes[0].plot(np.arange(1, len(epoch_loss) + 1), epoch_loss, label=transf)
+            axes[0].legend(fontsize=12)
+            axes[0].grid(True)
+            axes[0].set_ylabel('CE Loss')
+            axes[0].set_xlabel('Epoch #')
+            axes[0].set_ylim([0, max_loss])
+            axes[1].plot(np.arange(1, len(data_acc) + 1), data_acc)
+            axes[1].grid(True)
+            axes[1].set_ylabel('Accuracy')
+            axes[1].set_xlabel('Epoch #')
+            axes[1].set_ylim([0, 1])
+            plt.tight_layout()
+    plt.savefig(f'{save_dir}/inr_results.png')
+    acc_df.to_csv(f'{checkpoint_dir}/acc_df.csv')
+    plt.show()
+
+def process_all_siamse_experiments(checkpoint_dir, num_gpu=4, save_dir='plots'):
+    with open(f'{checkpoint_dir}/transforms.json', 'r') as f:
+        transforms_dict = json.load(f)
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 8))
+    max_loss = 0
+    for dir in os.listdir(checkpoint_dir):
+        if os.path.isdir(os.path.join(checkpoint_dir, dir)):
+            transf = transforms_dict[dir]
+            exp_num = dir[-1]
+            fit_res = process_results_multi_gpu(checkpoint_dir, exp_num, num_gpu=num_gpu, acc_as_std=True)
+            data_loss = fit_res['val_loss']
+            data_acc = fit_res['val_acc']
+            axes[0].plot(np.arange(1, len(data_loss) + 1), data_loss, label=transf)
+            axes[0].legend(fontsize=12)
+            axes[0].grid(True)
+            axes[0].set_ylabel('SimSiam Loss')
+            axes[0].set_xlabel('Iteration #')
+            axes[1].plot(np.arange(1, len(data_acc) + 1), data_acc)
+            axes[1].grid(True)
+            axes[1].set_ylabel('Std')
+            axes[1].set_xlabel('Epoch #')
+            std_ticks = ([0, 0.08, 0.125, 0.15], ['0', '', r'$\frac{1}{\sqrt{d}}$', ''])
+            axes[1].set_yticks(std_ticks[0])
+            axes[1].set_yticklabels(std_ticks[1])
+            plt.tight_layout()
+    plt.savefig(f'{save_dir}/siamse_results.png')
+    plt.show()
+
+def proccess_all_bedlam_experiments(checkpoint_dir, num_gpu=1, save_dir='plots'):
+    with open(f'{checkpoint_dir}/exps.json', 'r') as f:
+        exps = json.load(f)
+    max_loss = 0
+    for dir in os.listdir(checkpoint_dir):
+        if os.path.isdir(os.path.join(checkpoint_dir, dir)):
+            exp_num = dir[-1]
+            label = exps[dir]
+            fit_res = process_results_multi_gpu(checkpoint_dir, exp_num, num_gpu=num_gpu, acc_as_std=True)
+            data_loss = fit_res['val_loss']
+            data_acc = fit_res['val_acc']
+            # axes[0].plot(np.arange(1, len(data_loss) + 1), data_loss)
+            # axes[0].legend(fontsize=12)
+            # axes[0].grid(True)
+            # axes[0].set_ylabel('CE Loss')
+            # axes[0].set_xlabel('Iteration #')
+            # axes[1].plot(np.arange(1, len(data_acc) + 1), data_acc)
+            # axes[1].grid(True)
+            # axes[1].set_ylabel('Accuracy')
+            # axes[1].set_xlabel('Epoch #')
+            plt.plot(np.arange(1, len(data_acc) + 1), data_acc, label=label)
+            plt.grid(True)
+            plt.ylabel('Validation Accuracy')
+            plt.xlabel('Epoch #')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/bedlam_results.png')
+    plt.show()
+
