@@ -3,7 +3,7 @@
 this repository is an implementation of the final project in course:
 Geometric Deep Learning (CS236205)
 This repo is based on : https://github.com/mkofinas/neural-graphs 
-and has some identical parts
+and has some identical parts. <br>
 [Project Presentation](https://youtu.be/OxJi8qOXFk4)
 
 # Datasets #
